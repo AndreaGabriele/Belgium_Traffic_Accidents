@@ -8,7 +8,7 @@ library(readxl)
 library(httr)
 
 setwd("C:/Users/gabriele.a/Documents/R/")
-
+ 
 ## Download data from StatBel and append data in a Dataframe
 # url with MetaData on Column Names
 url_list <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2016_tcm326-283523.xlsx"
