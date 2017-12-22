@@ -45,7 +45,24 @@ for (url in url_list){
 }
 
 
-# use read metadata
+# use read metadata for columheaders
+url <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_META_tcm326-283604.xlsx"
+tf <- tempfile(fileext = ".xlsx")
+print(url)
+GET(url, write_disk(tf)) 
+df_headers <- read_excel(path = tf,sheet = 1, range = NULL, col_names = TRUE, col_types = NULL, trim_ws = TRUE, skip = 0, n_max = Inf )
+file.remove(tf)  
+
+# Remove the Dutch Colums
+df_reduce <- df %>% select(-ends_with("NL")) 
+df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME))
+
+#Rename the Colums using metadata
+names(df_reduce) <- df_headers_reduce$LABEL
+# View(head(df_reduce))
+
+
+
 
 
 
