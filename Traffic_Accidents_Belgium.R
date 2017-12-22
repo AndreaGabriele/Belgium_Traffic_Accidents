@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 
 library(dplyr)
 library(readr)
@@ -14,30 +14,34 @@ setwd("C:/Users/gabriele.a/Documents/R/")
 url_list <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2016_tcm326-283523.xlsx"
 url_list[2] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2015_tcm326-283522.xlsx"
 url_list[3] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2014_tcm326-283521.xlsx"
-url_list[4] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2013_tcm326-283520.xlsx"
-url_list[5] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2012_tcm326-283519.xlsx"
-url_list[6] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2011_tcm326-283518.xlsx"
-url_list[7] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2010_tcm326-283517.xlsx"
+url_list[4] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2013_tcm326-283460.xlsx"
+url_list[5] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2012_tcm326-283547.xlsx"
+url_list[6] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2011_tcm326-283546.xlsx"
+url_list[7] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2010_tcm326-283545.xlsx"
+url_list[8] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2009_tcm326-283544.xlsx"
 
-
+rm (df)
+    
 for (url in url_list){
   tf <- tempfile(fileext = ".xlsx")
-  
+  print(url)
   GET(url, write_disk(tf))
   
-  if (!exists("df")){
-    df <- read_xlsx(path = tf,sheet = NULL, range = NULL, col_names = TRUE,
-                    col_types = NULL, na = "", trim_ws = TRUE, skip = 0, n_max = Inf )
+  if (!exists("df", mode = "list")){
+    df <- read_excel(path = tf,sheet = 1, range = NULL, col_names = TRUE,
+                    col_types = NULL, trim_ws = TRUE, skip = 0, n_max = Inf )
   }
   
-  if (exists("df")){
+  else if (exists("df", mode = "list")){
     
-    df_temp <- read_xlsx(path = tf,sheet = NULL, range = NULL, col_names = TRUE,
+    df_temp <- read_excel(path = tf,sheet = NULL, range = NULL, col_names = TRUE,
                          col_types = NULL, na = "", trim_ws = TRUE, skip = 0, n_max = Inf )
     df <- rbind(df, df_temp)
     rm (df_temp)
-    file.remove(tf)  
     }
+  
+  file.remove(tf)  
+
 }
 
 
