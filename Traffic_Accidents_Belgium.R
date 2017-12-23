@@ -68,6 +68,7 @@ rm(df_headers, df_headers_reduce, tf, url,url_list)
 class(df_reduce)
 
 
+### Comparison Accidents by Gender
 df_reduce_summary <- df_reduce %>% 
   group_by(year(DT_DAY), CD_SEX) %>% 
   summarise(sum(MS_VCT),
@@ -76,8 +77,35 @@ df_reduce_summary <- df_reduce %>%
             sum(MS_DEAD_30_DAYS),
             sum(MS_DEAD))
 
-ggplot(data = df_reduce_summary, aes(df_reduce_summary$CD_SEX, df_reduce_summary$`sum(MS_VCT)`, fill = cut))
-            + geom_histogram(binwidth = 0.1)
+ggplot(df_reduce_summary, aes(x=CD_SEX,y=`sum(MS_DEAD)`,fill=CD_SEX)) +
+  facet_wrap(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
+  geom_bar(stat = "identity") + 
+  theme_minimal()
+
+### Comparison Accidents by Geography
+df_reduce_summary <- df_reduce %>% 
+  group_by(year(DT_DAY),TX_RGN_DESCR_FR, TX_PROV_DESCR_FR ) %>% 
+  summarise(sum(MS_VCT),
+            sum(MS_SLY_INJ),
+            sum(MS_SERLY_INJ),
+            sum(MS_DEAD_30_DAYS),
+            sum(MS_DEAD))
+df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
+
+## plotting Deads by Region
+ggplot(df_reduce_summary, aes(x=df_reduce_summary$TX_RGN_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_RGN_DESCR_FR)) +
+  facet_wrap(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
+  geom_bar(stat = "identity") + 
+  theme_minimal() +
+  coord_flip()
+
+## plotting Deads by Province
+ggplot(df_reduce_summary, aes(x=df_reduce_summary$TX_PROV_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_PROV_DESCR_FR)) +
+  facet_wrap(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
+  geom_bar(stat = "identity") + 
+  theme_minimal() +
+  coord_flip()
+
 
 
 barplot(table(df_reduce_summary$CD_SEX), horiz = F)
