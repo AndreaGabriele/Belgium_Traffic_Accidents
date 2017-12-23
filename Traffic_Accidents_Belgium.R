@@ -6,6 +6,7 @@ library(ggplot2)
 library(tidyr)
 library(readxl)
 library(httr)
+library(lubridate)
 
 setwd("C:/Users/gabriele.a/Documents/R/")
  
@@ -55,11 +56,47 @@ file.remove(tf)
 
 # Remove the Dutch Colums
 df_reduce <- df %>% select(-ends_with("NL")) 
-df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME))
+df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME)) 
 
 #Rename the Colums using metadata
 names(df_reduce) <- df_headers_reduce$LABEL
+df_reduce_ <- df_reduce %>% select(-starts_with("Business"))
+
+rm(df_headers, df_headers_reduce, tf, url,url_list)
 # View(head(df_reduce))
+
+class(df_reduce)
+
+
+df_reduce_summary <- df_reduce %>% 
+  group_by(year(DT_DAY), CD_SEX) %>% 
+  summarise(sum(MS_VCT),
+            sum(MS_SLY_INJ),
+            sum(MS_SERLY_INJ),
+            sum(MS_DEAD_30_DAYS),
+            sum(MS_DEAD))
+
+ggplot(data = df_reduce_summary, aes(df_reduce_summary$CD_SEX, df_reduce_summary$`sum(MS_VCT)`, fill = cut))
+            + geom_histogram(binwidth = 0.1)
+
+
+barplot(table(df_reduce_summary$CD_SEX), horiz = F)
+barplot(table(acc_reduce_summary$TX_LIGHT_COND_DESCR_FR), horiz = F)
+barplot(table(acc_reduce_summary$TX_VCT_TYPE_DESCR_FR), horiz = F)
+barplot(table(acc_reduce_summary$TX_SEX_DESCR_FR), horiz = F,las=2)
+barplot(table(acc_reduce_summary$TX_MUNTY_DESCR_FR), horiz = T,las=2)
+barplot(table(acc_reduce_summary$TX_PROV_DESCR_FR), horiz = T,cex.names = 0.8, las=2)
+
+which(df_reduce_summary$sex=="Femmes")
+
+head(df_reduce)
+
+
+
+
+
+
+
 
 
 
