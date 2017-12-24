@@ -59,8 +59,8 @@ df_reduce <- df %>% select(-ends_with("NL"))
 df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME)) 
 
 #Rename the Colums using metadata
-names(df_reduce) <- df_headers_reduce$LABEL
-df_reduce_ <- df_reduce %>% select(-starts_with("Business"))
+#names(df_reduce) <- df_headers_reduce$LABEL
+#df_reduce_ <- df_reduce %>% select(-starts_with("Business"))
 
 rm(df_headers, df_headers_reduce, tf, url,url_list)
 # View(head(df_reduce))
@@ -77,14 +77,17 @@ df_reduce_summary <- df_reduce %>%
             sum(MS_DEAD_30_DAYS),
             sum(MS_DEAD))
 
-ggplot(df_reduce_summary, aes(x=CD_SEX,y=`sum(MS_DEAD)`,fill=CD_SEX)) +
-  facet_wrap(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
-  geom_bar(stat = "identity") + 
-  theme_minimal()
+
+ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)`,fill=CD_SEX)) +
+  geom_bar(stat = "identity", position=position_dodge()) + 
+  geom_line(aes(colour = CD_SEX)) +
+  scale_x_continuous(breaks = df_reduce_summary$`year(DT_DAY)`) +
+  theme(axis.text.x=element_text(size = 8, colour = "black", angle = 90, hjust = 0, vjust = 0.5))
+
 
 ### Comparison Accidents by Geography
 df_reduce_summary <- df_reduce %>% 
-  group_by(year(DT_DAY),TX_RGN_DESCR_FR, TX_PROV_DESCR_FR ) %>% 
+  group_by(year(DT_DAY),TX_RGN_DESCR_FR ) %>% 
   summarise(sum(MS_VCT),
             sum(MS_SLY_INJ),
             sum(MS_SERLY_INJ),
@@ -93,18 +96,32 @@ df_reduce_summary <- df_reduce %>%
 df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
 
 ## plotting Deads by Region
-ggplot(df_reduce_summary, aes(x=df_reduce_summary$TX_RGN_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_RGN_DESCR_FR)) +
-  facet_wrap(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
+ggplot(df_reduce_summary, aes(x=TX_RGN_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_RGN_DESCR_FR)) +
+  facet_grid(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
   geom_bar(stat = "identity") + 
-  theme_minimal() +
-  coord_flip()
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
+df_reduce_summary <- df_reduce %>% 
+  group_by(year(DT_DAY),TX_PROV_DESCR_FR ) %>% 
+  summarise(sum(MS_VCT),
+            sum(MS_SLY_INJ),
+            sum(MS_SERLY_INJ),
+            sum(MS_DEAD_30_DAYS),
+            sum(MS_DEAD))
+df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
 ## plotting Deads by Province
-ggplot(df_reduce_summary, aes(x=df_reduce_summary$TX_PROV_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_PROV_DESCR_FR)) +
-  facet_wrap(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
-  geom_bar(stat = "identity") + 
-  theme_minimal() +
-  coord_flip()
+ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)`,group = df_reduce_summary$TX_PROV_DESCR_FR)) +
+  geom_line(aes(colour = TX_PROV_DESCR_FR, position = "stack")) +
+  geom_point(aes(colour = TX_PROV_DESCR_FR, position = "stack"))  + 
+  theme(axis.text.x = element_text(angle = 60, hjust = 1))
+
+
+ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_SERLY_INJ)`,group = df_reduce_summary$TX_PROV_DESCR_FR)) +
+  geom_line(aes(colour = TX_PROV_DESCR_FR, position = "stack")) +
+  geom_point(aes(colour = TX_PROV_DESCR_FR, position = "stack"))
+
+
+
 
 
 
