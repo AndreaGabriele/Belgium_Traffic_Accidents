@@ -79,13 +79,16 @@ df_reduce_summary <- df_reduce %>%
 
 
 ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)`,fill=CD_SEX)) +
-  geom_bar(stat = "identity", position=position_dodge()) + 
-  geom_line(aes(colour = CD_SEX)) +
+  geom_bar(stat = "identity", position=position_dodge()) +
   scale_x_continuous(breaks = df_reduce_summary$`year(DT_DAY)`) +
-  theme(axis.text.x=element_text(size = 8, colour = "black", angle = 90, hjust = 0, vjust = 0.5))
+  scale_y_continuous(breaks = seq(0, 600, 50)) +
+  labs(x = "Year",y = "Number Dead", title = "Car Accident Dead by Gender in Belgium") +
+  theme(axis.text.x=element_text(size = 9, colour = "black", angle = 90, hjust = 0, vjust = 0.5),
+        axis.text.y=element_text(size = 9, colour = "black", angle = 0, hjust = 0, vjust = 0.5)) +
+scale_fill_manual("Gender",values=c("orange","red","grey"))
+#geom_line(aes(colour = CD_SEX), size = 1.2)
 
-
-### Comparison Accidents by Geography
+  ### Comparison Accidents by Geography
 df_reduce_summary <- df_reduce %>% 
   group_by(year(DT_DAY),TX_RGN_DESCR_FR ) %>% 
   summarise(sum(MS_VCT),
