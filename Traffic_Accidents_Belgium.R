@@ -20,6 +20,13 @@ url_list[5] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2012_tcm
 url_list[6] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2011_tcm326-283546.xlsx"
 url_list[7] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2010_tcm326-283545.xlsx"
 url_list[8] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2009_tcm326-283544.xlsx"
+url_list[9] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2008_tcm326-283543.xlsx"
+url_list[10] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2007_tcm326-283542.xlsx"
+url_list[11] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2006_tcm326-283541.xlsx"
+url_list[12] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2005_tcm326-283540.xlsx"
+url_list[13] <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_2002_tcm326-283539.xlsx"
+
+
 
 rm (df)
     
@@ -46,6 +53,7 @@ for (url in url_list){
 }
 
 
+
 # use read metadata for columheaders
 url <- "http://statbel.fgov.be/fr/binaries/TF_ACCIDENTS_VICTIMS_META_tcm326-283604.xlsx"
 tf <- tempfile(fileext = ".xlsx")
@@ -57,7 +65,7 @@ file.remove(tf)
 # Remove the Dutch Colums
 df_reduce <- df %>% select(-ends_with("NL")) 
 df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME)) 
-
+View(df_headers_reduce)
 #Rename the Colums using metadata
 #names(df_reduce) <- df_headers_reduce$LABEL
 #df_reduce_ <- df_reduce %>% select(-starts_with("Business"))
@@ -81,14 +89,103 @@ df_reduce_summary <- df_reduce %>%
 ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)`,fill=CD_SEX)) +
   geom_bar(stat = "identity", position=position_dodge()) +
   scale_x_continuous(breaks = df_reduce_summary$`year(DT_DAY)`) +
-  scale_y_continuous(breaks = seq(0, 600, 50)) +
+  scale_y_continuous(breaks = seq(0, 900, 50)) +
   labs(x = "Year",y = "Number Dead", title = "Car Accident Dead by Gender in Belgium") +
   theme(axis.text.x=element_text(size = 9, colour = "black", angle = 90, hjust = 0, vjust = 0.5),
         axis.text.y=element_text(size = 9, colour = "black", angle = 0, hjust = 0, vjust = 0.5)) +
 scale_fill_manual("Gender",values=c("orange","red","grey"))
-#geom_line(aes(colour = CD_SEX), size = 1.2)
 
-  ### Comparison Accidents by Geography
+
+### Difference between Male / Female Victimes
+df_reduce_summary <- df_reduce %>% 
+  filter(TX_VCT_TYPE_DESCR_FR!= "Autre victime" & TX_VCT_TYPE_DESCR_FR!= "Non disponible") %>% 
+  group_by(CD_SEX, TX_VCT_TYPE_DESCR_FR) %>% 
+  summarise(sum(MS_VCT),
+            sum(MS_SLY_INJ),
+            sum(MS_SERLY_INJ),
+            sum(MS_DEAD_30_DAYS),
+            sum(MS_DEAD))
+
+ggplot(df_reduce_summary, aes(x=TX_VCT_TYPE_DESCR_FR,y=`sum(MS_DEAD)`,fill=CD_SEX)) +
+  geom_bar(stat = "identity", position=position_dodge()) +
+  scale_y_continuous(breaks = seq(0, 7500, 500)) +
+  labs(x = "Victime type",y = "Number Dead", title = "Role in the Accident by Gender in Belgium") +
+  theme(axis.text.x=element_text(size = 9, colour = "black", angle = 0, hjust = 0.5, vjust = 0),
+        axis.text.y=element_text(size = 9, colour = "black", angle = 0, hjust = 0, vjust = 0)) +
+  scale_fill_manual("Gender",values=c("orange","red","grey"))
+
+### Conclusions More man dye of car accident than women do if the man is the driver 
+### one can infer that if the drive has a pannager the acidents are less
+
+
+### Age Distribution of accidents
+df_reduce_summary <- df_reduce %>% 
+  filter(TX_VCT_TYPE_DESCR_FR == "Conducteur ou piéton" & MS_DEAD != 0) %>% 
+  group_by(TX_DAY_OF_WEEK_DESCR_FR,CD_SEX,CD_AGE_CLS) %>% 
+  summarise(sum(MS_DEAD))
+
+ggplot(df_reduce_summary, aes(x=CD_AGE_CLS,y=df_reduce_summary$`sum(MS_DEAD)`,fill=CD_SEX)) +
+  geom_bar(stat = "identity", position=position_dodge()) +
+  facet_wrap(~df_reduce_summary$TX_DAY_OF_WEEK_DESCR_FR, scales = 'free_x') +
+  scale_y_continuous(breaks = seq(0, 230, 10)) +
+  scale_x_continuous(breaks = seq(18, 90, 2)) +
+  labs(x = "Victime Age",y = "Number Dead", title = "Age distibution by Day of Week")
+### Conclsions only by the age of 55 the % accidents of man becomes similar to the one of Females
+
+### Age Distrubution 
+tmp <- df_reduce %>% 
+  filter((TX_VCT_TYPE_DESCR_FR == "Conducteur ou piéton" | 
+         TX_VCT_TYPE_DESCR_FR == "Passager") & 
+         MS_DEAD != 0 &
+         CD_SEX != "NA")
+
+ggplot(tmp, aes(x = tmp$CD_AGE_CLS, color = tmp$CD_SEX)) +
+  geom_histogram(aes(y=..count..), bins = 80,  position="dodge",  na.rm = FALSE) +
+  facet_wrap(~tmp$TX_VCT_TYPE_DESCR_FR, scales = 'free_x') +
+  geom_density(stat = "count", position="identity", alpha=1, size = 1.1) +
+  scale_y_continuous(breaks = seq(0, 230, 10)) +
+  scale_x_continuous(limits = c(18,90), breaks = seq(18, 90, 5)) +
+  labs(x = "Victime Age",y = "Number Dead", title = "Age distibution") + 
+  scale_colour_manual("Gender",values=c("orange","red"))
+
+##Latitude longitute per comune PostCode - Comune - Long - Latitude
+url <- ("https://raw.githubusercontent.com/jief/zipcode-belgium/master/zipcode-belgium.csv")
+lat_long <-read.csv(url, header=F)
+names(lat_long) <- c("PostCode","Comune","Longitude", "Latitude")
+View(lat_long)
+
+##NIS code into Post Code per comune 
+url <- ("http://ckan-001.corve.openminds.be/storage/f/2013-06-06T12%3A17%3A06.134Z/gemeentecodes.csv")
+NIS_to_Post_code <- read.delim(url, header=T, sep = ";")
+View(NIS_to_Post_code)
+
+# select from data base only the comunes we have postcode for
+df_reduce_ <- df_reduce %>% 
+  subset(df_reduce$CD_MUNTY_REFNIS != NIS_to_Post_code$NIS.code) 
+
+df_reduce_$CD_MUNTY_REFNIS <- as.integer(df_reduce_$CD_MUNTY_REFNIS)
+
+
+#remove duplicates in the new data tables
+NIS_to_Post_code_ <- NIS_to_Post_code[,1:2]
+NIS_to_Post_code_ <- NIS_to_Post_code_[which(!duplicated(NIS_to_Post_code_[ ,1])==TRUE),1:2]
+lat_long_ <- lat_long[which(!duplicated(lat_long[,1])==T),c(1,3,4)]
+
+#Join Tables together
+rm(df_reduce_LatLong)
+df_reduce_LatLong <- df_reduce_ %>% 
+                    left_join(NIS_to_Post_code_, by = c("CD_MUNTY_REFNIS" = "NIS.code")) %>% 
+                    left_join(lat_long_, by = c("Postcode" = "PostCode"))
+
+####  df_reduce_LatLong has now latitude and longitudes per accidents
+library(ggmap)
+qmap(location = 'Belgium', zoom = 10, maptype = 'hybrid')
+
+
+
+
+### Comparison Accidents by Geography
+## plotting Deads by Region
 df_reduce_summary <- df_reduce %>% 
   group_by(year(DT_DAY),TX_RGN_DESCR_FR ) %>% 
   summarise(sum(MS_VCT),
@@ -98,12 +195,12 @@ df_reduce_summary <- df_reduce %>%
             sum(MS_DEAD))
 df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
 
-## plotting Deads by Region
 ggplot(df_reduce_summary, aes(x=TX_RGN_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_RGN_DESCR_FR)) +
   facet_grid(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
   geom_bar(stat = "identity") + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
 
+## plotting Deads by Province
 df_reduce_summary <- df_reduce %>% 
   group_by(year(DT_DAY),TX_PROV_DESCR_FR ) %>% 
   summarise(sum(MS_VCT),
@@ -112,12 +209,11 @@ df_reduce_summary <- df_reduce %>%
             sum(MS_DEAD_30_DAYS),
             sum(MS_DEAD))
 df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
-## plotting Deads by Province
+
 ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)`,group = df_reduce_summary$TX_PROV_DESCR_FR)) +
   geom_line(aes(colour = TX_PROV_DESCR_FR, position = "stack")) +
   geom_point(aes(colour = TX_PROV_DESCR_FR, position = "stack"))  + 
   theme(axis.text.x = element_text(angle = 60, hjust = 1))
-
 
 ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_SERLY_INJ)`,group = df_reduce_summary$TX_PROV_DESCR_FR)) +
   geom_line(aes(colour = TX_PROV_DESCR_FR, position = "stack")) +
@@ -128,7 +224,7 @@ ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_SERLY
 
 
 
-barplot(table(df_reduce_summary$CD_SEX), horiz = F)
+barplot(table(df_reduce$CD_AGE_CLS), horiz = F)
 barplot(table(acc_reduce_summary$TX_LIGHT_COND_DESCR_FR), horiz = F)
 barplot(table(acc_reduce_summary$TX_VCT_TYPE_DESCR_FR), horiz = F)
 barplot(table(acc_reduce_summary$TX_SEX_DESCR_FR), horiz = F,las=2)
