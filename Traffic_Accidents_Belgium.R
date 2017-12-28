@@ -171,18 +171,94 @@ NIS_to_Post_code_ <- NIS_to_Post_code[,1:2]
 NIS_to_Post_code_ <- NIS_to_Post_code_[which(!duplicated(NIS_to_Post_code_[ ,1])==TRUE),1:2]
 lat_long_ <- lat_long[which(!duplicated(lat_long[,1])==T),c(1,3,4)]
 
+# Add the ISO nomenclature per Province
+library(ISOcodes)
+data("ISO_3166_2")
+ISO_3166_2_BE <- ISO_3166_2[grep("BE-", ISO_3166_2$Code), ]
+ISO_3166_2_BE <- ISO_3166_2_BE[order(ISO_3166_2_BE$Name),]
+
+ISO_Region <- c("Antwerp",	"Province d'Anvers")
+ISO_Region <- rbind(ISO_Region,c("Walloon Brabant",	"Province de Brabant wallon"))
+ISO_Region <- rbind(ISO_Region,c("Hainaut",	"Province de Hainaut"))
+ISO_Region <- rbind(ISO_Region,c("Liege",  "Province de Liège"))
+ISO_Region <- rbind(ISO_Region,c("Limburg",  "Province de Limbourg"))
+ISO_Region <- rbind(ISO_Region,c("Luxembourg",  "Province de Luxembourg"))
+ISO_Region <- rbind(ISO_Region,c("Province of Namur",  "Province de Namur"))
+ISO_Region <- rbind(ISO_Region,c("East Flanders",  "Province de Flandre orientale"))
+ISO_Region <- rbind(ISO_Region,c("Flemish Brabant",  "Province de Brabant flamand"))
+ISO_Region <- rbind(ISO_Region,c("West Flanders",  "Province de Flandre occidentale"))
+ISO_Region<- as.data.frame(ISO_Region)
+names(ISO_Region) <- c("ISO_Name", "Name")
+
+
+
 #Join Tables together
 rm(df_reduce_LatLong)
 df_reduce_LatLong <- df_reduce_ %>% 
                     left_join(NIS_to_Post_code_, by = c("CD_MUNTY_REFNIS" = "NIS.code")) %>% 
-                    left_join(lat_long_, by = c("Postcode" = "PostCode"))
+                    left_join(lat_long_, by = c("Postcode" = "PostCode")) %>% 
+                    left_join(ISO_Region, by = c("TX_PROV_DESCR_FR" = "Name"))
+
+names(df_reduce_LatLong)[names(df_reduce_LatLong) == "Latitude"] <- "lat"
+names(df_reduce_LatLong)[names(df_reduce_LatLong) == "Longitude"] <- "long"
+
+
+df_reduce_LatLong_ <- df_reduce_LatLong %>% 
+  group_by(TX_ADM_DSTR_DESCR_FR)  %>% 
+  summarise(count_dead = sum(MS_DEAD), 
+            lat = round(mean(lat),1), 
+            long = round(mean(long),1)
+            ) %>% 
+  ungroup()
+
+df_reduce_LatLong_$latlong<-paste(df_reduce_LatLong_$lat,df_reduce_LatLong_$long, sep=":")
+
 
 ####  df_reduce_LatLong has now latitude and longitudes per accidents
+# df_reduce_LatLong <- df_reduce_LatLong_[!is.na(df_reduce_LatLong_$ISO_Name),]
+df_reduce_LatLong_ <- df_reduce_LatLong_[!is.na(df_reduce_LatLong_$long),]
+
+
+library(googleVis)
+
+Map_ <- gvisGeoChart(df_reduce_LatLong_, "latlong", 
+                      colorvar='count_dead', hovervar='TX_ADM_DSTR_DESCR_FR',
+                      options=list(region=      "BE", 
+                                   dataMode=    "Marker",
+                                   #displayMode= "provinces",
+                                   resolution="provinces"
+                                   )
+                   )
+
+Table_ <- gvisTable(df_reduce_LatLong_[,1:2], 
+               options=list(height=300))
+
+GT <- gvisMerge(Map_,Table_, horizontal=TRUE) 
+
+plot(GT)
+
+
+# and in Brussels which comunes are more affected by car accidents? 
+# use ggmap
+
 library(ggmap)
-qmap(location = 'Belgium', zoom = 10, maptype = 'hybrid')
+# load the data
+tartu_housing <- read.csv("data/tartu_housing_xy_wgs84_a.csv", sep = ";")
+
+# Download the base map
+tartu_map_g_str <- get_map(location = "tartu", zoom = 13)
+# Draw the heat map
+ggmap(tartu_map_g_str, extent = "device") + geom_density2d(data = tartu_housing, aes(x = lon, y = lat), size = 0.3) + 
+  stat_density2d(data = tartu_housing, 
+                 aes(x = lon, y = lat, fill = ..level.., alpha = ..level..), size = 0.01, 
+                 bins = 16, geom = "polygon") + scale_fill_gradient(low = "green", high = "red") + 
+  scale_alpha(range = c(0, 0.3), guide = FALSE)
+
+qmap(location = 'Bruxelles', zoom = 10, maptype = 'hybrid')
 
 
 
+plot(GeoStates)
 
 ### Comparison Accidents by Geography
 ## plotting Deads by Region
