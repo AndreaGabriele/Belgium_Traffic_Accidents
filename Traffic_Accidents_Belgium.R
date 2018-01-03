@@ -65,7 +65,7 @@ file.remove(tf)
 # Remove the Dutch Colums
 df_reduce <- df %>% select(-ends_with("NL")) 
 df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME)) 
-View(df_headers_reduce)
+#View(df_headers_reduce)
 #Rename the Colums using metadata
 #names(df_reduce) <- df_headers_reduce$LABEL
 #df_reduce_ <- df_reduce %>% select(-starts_with("Business"))
@@ -110,8 +110,8 @@ ggplot(df_reduce_summary, aes(x=TX_VCT_TYPE_DESCR_FR,y=`sum(MS_DEAD)`,fill=CD_SE
   geom_bar(stat = "identity", position=position_dodge()) +
   scale_y_continuous(breaks = seq(0, 7500, 500)) +
   labs(x = "Victime type",y = "Number Dead", title = "Role in the Accident by Gender in Belgium") +
-  theme(axis.text.x=element_text(size = 9, colour = "black", angle = 0, hjust = 0.5, vjust = 0),
-        axis.text.y=element_text(size = 9, colour = "black", angle = 0, hjust = 0, vjust = 0)) +
+  theme(axis.text.x=element_text(size = 12, colour = "black", angle = 0, hjust = 0.5, vjust = 0),
+        axis.text.y=element_text(size = 12, colour = "black", angle = 0, hjust = 0, vjust = 0)) +
   scale_fill_manual("Gender",values=c("orange","red","grey"))
 
 ### Conclusions More man dye of car accident than women do if the man is the driver 
@@ -127,9 +127,10 @@ df_reduce_summary <- df_reduce %>%
 ggplot(df_reduce_summary, aes(x=CD_AGE_CLS,y=df_reduce_summary$`sum(MS_DEAD)`,fill=CD_SEX)) +
   geom_bar(stat = "identity", position=position_dodge()) +
   facet_wrap(~df_reduce_summary$TX_DAY_OF_WEEK_DESCR_FR, scales = 'free_x') +
-  scale_y_continuous(breaks = seq(0, 230, 10)) +
-  scale_x_continuous(breaks = seq(18, 90, 2)) +
+  scale_y_continuous(breaks = seq(0, 230, 10)) + 
+  scale_x_continuous(breaks = seq(18, 90, 5), limits = c(18, 90)) +
   labs(x = "Victime Age",y = "Number Dead", title = "Age distibution by Day of Week")
+  
 ### Conclsions only by the age of 55 the % accidents of man becomes similar to the one of Females
 
 ### Age Distrubution 
@@ -204,12 +205,12 @@ names(df_reduce_LatLong)[names(df_reduce_LatLong) == "Longitude"] <- "long"
 
 
 df_reduce_LatLong_ <- df_reduce_LatLong %>% 
-  group_by(TX_ADM_DSTR_DESCR_FR)  %>% 
+  group_by(TX_ADM_DSTR_DESCR_FR, TX_ROAD_TYPE_DESCR_FR)  %>% 
   summarise(count_dead = sum(MS_DEAD), 
             lat = round(mean(lat),1), 
             long = round(mean(long),1)
-            ) %>% 
-  ungroup()
+  ) #%>% 
+#ungroup()
 
 df_reduce_LatLong_$latlong<-paste(df_reduce_LatLong_$lat,df_reduce_LatLong_$long, sep=":")
 
@@ -219,23 +220,90 @@ df_reduce_LatLong_$latlong<-paste(df_reduce_LatLong_$lat,df_reduce_LatLong_$long
 df_reduce_LatLong_ <- df_reduce_LatLong_[!is.na(df_reduce_LatLong_$long),]
 
 
+library(stringr)
 library(googleVis)
 
-Map_ <- gvisGeoChart(df_reduce_LatLong_, "latlong", 
-                      colorvar='count_dead', hovervar='TX_ADM_DSTR_DESCR_FR',
-                      options=list(region=      "BE", 
-                                   dataMode=    "Marker",
-                                   #displayMode= "provinces",
-                                   resolution="provinces"
-                                   )
-                   )
 
-Table_ <- gvisTable(df_reduce_LatLong_[,1:2], 
-               options=list(height=300))
+Map_Autoroute <- gvisGeoChart(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="A"), "latlong", 
+                              colorvar='count_dead', hovervar='TX_ADM_DSTR_DESCR_FR',
+                              options=list(region=      "BE", 
+                                           dataMode=    "Marker",
+                                           #displayMode= "provinces",
+                                           resolution="provinces",
+                                           colorAxis="{values:[0, 120],
+                                                       colors:[\'White', \'Blue\']}"
+                              )
+)
 
-GT <- gvisMerge(Map_,Table_, horizontal=TRUE) 
+Map_Route <- gvisGeoChart(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="R"), "latlong", 
+                          colorvar='count_dead', hovervar='TX_ADM_DSTR_DESCR_FR',
+                          options=list(region=      "BE", 
+                                       dataMode=    "Marker",
+                                       #displayMode= "provinces",
+                                       resolution="provinces", 
+                                       colorAxis="{values:[50, 500],
+                                                       colors:[\'green', \'red\']}"
+                          )
+)
 
-plot(GT)
+
+Table_Autoroute <- gvisTable(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="A")[,c(1,3)], 
+                             options=list(height=300))
+
+Table_Route <- gvisTable(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="R")[,c(1,3)], 
+                         options=list(height=300))
+
+plot(Table_T)
+
+AT_T <- gvisMerge(Map_Autoroute,Table_Autoroute, horizontal=TRUE) 
+AT_R <- gvisMerge(Map_Route,Table_Route, horizontal=TRUE) 
+AT <- gvisMerge(AT_T,AT_R,horizontal = FALSE)
+
+plot(AT)
+
+cat(AT$html$chart, file = "Traffic_accidents_by_district.html")
+
+
+## Build a model on the categorical
+##Scope is to understand what factors play the biggest role in the accidents
+## Def: an accident is 
+
+
+# model mpg ~ cyl with cyl being categorical
+mtcars_mod2 <- lm(Dead_ ~ as.factor(cyl), data = mtcars)
+
+# plot the predictions
+mtcars %>%
+  add_predictions(mtcars_mod2) %>%
+  ggplot(aes(as.factor(cyl), mpg)) +
+  geom_boxplot() +
+  geom_point() +
+  geom_point(aes(y = pred), color = "red", size = 4)
+
+# plot the residuals
+mtcars %>%
+  add_residuals(mtcars_mod2) %>%
+  ggplot(aes(as.factor(cyl))) +
+  geom_ref_line(h = 0) +
+  geom_point(aes(y = resid))
+
+
+
+
+
+# http://www.bnosac.be/index.php/blog/55-belgiummaps-statbel-r-package-with-administrative-boundaries-of-belgium
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # and in Brussels which comunes are more affected by car accidents? 
