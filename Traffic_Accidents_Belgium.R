@@ -253,32 +253,82 @@ Table_Autoroute <- gvisTable(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESC
 Table_Route <- gvisTable(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="R")[,c(1,3)], 
                          options=list(height=300))
 
-plot(Table_T)
-
 AT_T <- gvisMerge(Map_Autoroute,Table_Autoroute, horizontal=TRUE) 
 AT_R <- gvisMerge(Map_Route,Table_Route, horizontal=TRUE) 
 AT <- gvisMerge(AT_T,AT_R,horizontal = FALSE)
 
 plot(AT)
 
-cat(AT$html$chart, file = "Traffic_accidents_by_district.html")
+#cat(AT$html$chart, file = "Traffic_accidents_by_district.html")
 
-
+library(MASS)
 ## Build a model on the categorical
 ##Scope is to understand what factors play the biggest role in the accidents
 ## Def: an accident is 
 
+df_reduce_LatLong$DT_HOUR
+df_reduce_LatLong$TX_DAY_OF_WEEK_DESCR_FR
+df_reduce_LatLong$TX_ROAD_USR_TYPE_DESCR_FR
+df_reduce_LatLong$TX_ROAD_TYPE_DESCR_FR
+df_reduce_LatLong$TX_LIGHT_COND_DESCR_FR
+df_reduce_LatLong$TX_BUILD_UP_AREA_DESCR_FR
+df_reduce_LatLong$CD_AGE_CLS
+df_reduce_LatLong$TX_SEX_DESCR_FR
 
+#filter only  == Conducteur ou piéton
+df_reduce_LatLong$TX_VCT_TYPE_DESCR_FR
+
+df_model <- df_reduce_LatLong %>% 
+  filter(df_reduce_LatLong$TX_VCT_TYPE_DESCR_FR == "Conducteur ou piéton" &
+         (df_reduce_LatLong$MS_DEAD == 0 | df_reduce_LatLong$MS_DEAD == 1) &
+           TX_SEX_DESCR_FR != "Non disponible" & 
+           TX_LIGHT_COND_DESCR_FR != "Non disponible" &
+           TX_LIGHT_COND_DESCR_FR != "Non disponible" &
+           TX_ROAD_TYPE_DESCR_FR != "Inconnu" &
+           TX_BUILD_UP_AREA_DESCR_FR != "Non disponible" &
+           TX_ROAD_USR_TYPE_DESCR_FR != "Non disponible") %>% 
+  mutate(MS_DEAD = factor(MS_DEAD))
+
+library(modelr)  
+
+m <- glm( MS_DEAD ~  
+     DT_HOUR + 
+     TX_DAY_OF_WEEK_DESCR_FR +
+     TX_ROAD_TYPE_DESCR_FR +
+     TX_LIGHT_COND_DESCR_FR +
+     TX_BUILD_UP_AREA_DESCR_FR +
+     CD_AGE_CLS +
+     TX_SEX_DESCR_FR, 
+     df_model,
+     family="binomial")
+
+summary(m)
 # model mpg ~ cyl with cyl being categorical
-mtcars_mod2 <- lm(Dead_ ~ as.factor(cyl), data = mtcars)
 
 # plot the predictions
-mtcars %>%
-  add_predictions(mtcars_mod2) %>%
-  ggplot(aes(as.factor(cyl), mpg)) +
-  geom_boxplot() +
+df_model %>%
+  select(MS_DEAD, 
+#         DT_HOUR, 
+#         TX_DAY_OF_WEEK_DESCR_FR, 
+#         TX_ROAD_TYPE_DESCR_FR,
+#         TX_LIGHT_COND_DESCR_FR,
+#         TX_BUILD_UP_AREA_DESCR_FR,
+#         CD_AGE_CLS,
+         TX_SEX_DESCR_FR) %>%
+  add_predictions(m) %>%
+ # add_residuals(m) %>%
+  ggplot(aes(TX_SEX_DESCR_FR, MS_DEAD)) +
+#  geom_point() +
+  geom_line(aes(y = pred), color = "red")
+
+
+ggplot(df_model, aes(x = TX_SEX_DESCR_FR, y = MS_DEAD)) + 
   geom_point() +
-  geom_point(aes(y = pred), color = "red", size = 4)
+  stat_smooth(method = "lm", col = "red")
+
+
+
+
 
 # plot the residuals
 mtcars %>%
