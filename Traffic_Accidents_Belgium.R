@@ -328,7 +328,7 @@ fitted.results <- predict(m,newdata=subset(df_model_Test,select=c( which( colnam
 ,type='response')
 
 
-fitted.results <- ifelse(fitted.results > 0.5,1,0)
+fitted.results <- ifelse(fitted.results > 0.1,1,0)
 col_na = which(is.na(fitted.results))
 
 Dead_Model_count <- nrow(filter(df_model_Test, MS_SERLY_INJ == 1))
@@ -336,6 +336,22 @@ Dead_Model_count <- nrow(filter(df_model_Test, MS_SERLY_INJ == 1))
 
 misClasificError <- mean(fitted.results[-col_na] != df_model_Test$Victims[-col_na])
 print(paste('Accuracy',1-misClasificError))
+
+
+library(ROCR)
+# ROC and AUC
+pr <- prediction(fitted.results, df_model_Test$Victims)
+# TPR = sensitivity, FPR=specificity
+
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+
+
+
+
+
+
 
 
 
