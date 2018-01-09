@@ -266,43 +266,84 @@ library(MASS)
 ##Scope is to understand what factors play the biggest role in the accidents
 ## Def: an accident is 
 
-df_reduce_LatLong$DT_HOUR
-df_reduce_LatLong$TX_DAY_OF_WEEK_DESCR_FR
-df_reduce_LatLong$TX_ROAD_USR_TYPE_DESCR_FR
-df_reduce_LatLong$TX_ROAD_TYPE_DESCR_FR
-df_reduce_LatLong$TX_LIGHT_COND_DESCR_FR
-df_reduce_LatLong$TX_BUILD_UP_AREA_DESCR_FR
-df_reduce_LatLong$CD_AGE_CLS
-df_reduce_LatLong$TX_SEX_DESCR_FR
-
 #filter only  == Conducteur ou piéton
-df_reduce_LatLong$TX_VCT_TYPE_DESCR_FR
 
 df_model <- df_reduce_LatLong %>% 
   filter(df_reduce_LatLong$TX_VCT_TYPE_DESCR_FR == "Conducteur ou piéton" &
-         (df_reduce_LatLong$MS_DEAD == 0 | df_reduce_LatLong$MS_DEAD == 1) &
-           TX_SEX_DESCR_FR != "Non disponible" & 
-           TX_LIGHT_COND_DESCR_FR != "Non disponible" &
-           TX_LIGHT_COND_DESCR_FR != "Non disponible" &
-           TX_ROAD_TYPE_DESCR_FR != "Inconnu" &
-           TX_BUILD_UP_AREA_DESCR_FR != "Non disponible" &
-           TX_ROAD_USR_TYPE_DESCR_FR != "Non disponible") %>% 
-  mutate(MS_DEAD = factor(MS_DEAD))
+           (TX_SEX_DESCR_FR           != "Non disponible"   | !is.na(TX_SEX_DESCR_FR)) & 
+           (TX_LIGHT_COND_DESCR_FR    != "Non disponible"   | !is.na(TX_LIGHT_COND_DESCR_FR)) & 
+           (TX_ROAD_TYPE_DESCR_FR     != "Inconnu"          | !is.na(TX_ROAD_TYPE_DESCR_FR)) & 
+           (TX_BUILD_UP_AREA_DESCR_FR != "Non disponible"   | !is.na(TX_BUILD_UP_AREA_DESCR_FR)) & 
+           (TX_ROAD_USR_TYPE_DESCR_FR != "Non disponible"   | !is.na(TX_ROAD_USR_TYPE_DESCR_FR ) | (TX_ROAD_USR_TYPE_DESCR_FR != "Inconnu"))) %>% 
+  mutate(Victims = MS_DEAD + MS_VCT + MS_SLY_INJ + MS_SERLY_INJ + MS_MORY_INJ + MS_DEAD_30_DAYS) %>% 
+  mutate(Victims = as.factor(ifelse(Victims > 0,1,0))) %>% 
+  filter(!is.na(Victims))
 
-library(modelr)  
+#TX_ROAD_USR_TYPE_DESCR_FR Inconnu
+#library(Amelia)
+# missmap(df_model, main = "Missing values vs observed")
 
-m <- glm( MS_DEAD ~  
+
+n <- nrow(df_model)
+ind <- sample(c(TRUE, FALSE), n, replace=TRUE, prob=c(0.8, 0.2))
+
+df_model_Train =  df_model[ind, ]
+df_model_Test =  df_model[!ind, ]
+  
+
+library(modelr)
+
+m <- glm( Victims ~  
      DT_HOUR + 
      TX_DAY_OF_WEEK_DESCR_FR +
      TX_ROAD_TYPE_DESCR_FR +
      TX_LIGHT_COND_DESCR_FR +
      TX_BUILD_UP_AREA_DESCR_FR +
      CD_AGE_CLS +
-     TX_SEX_DESCR_FR, 
-     df_model,
-     family="binomial")
+     TX_SEX_DESCR_FR + 
+     TX_ROAD_USR_TYPE_DESCR_FR +
+     TX_COLL_TYPE_DESCR_FR, 
+     family=binomial(link='logit'),
+     data = df_model_Train)
+
 
 summary(m)
+
+# anova(m, test="Chisq")
+
+#-------------------------------------------------------------------------------
+# MEASURING THE PREDICTIVE ABILITY OF THE MODEL
+# If prob > 0.5 then 1, else 0. Threshold can be set for better results
+fitted.results <- predict(m,newdata=subset(df_model_Test,select=c( which( colnames(df_model)=="DT_HOUR"),
+                                                                   which( colnames(df_model)=="TX_DAY_OF_WEEK_DESCR_FR"),
+                                                                   which( colnames(df_model)=="TX_ROAD_TYPE_DESCR_FR"),
+                                                                   which( colnames(df_model)=="TX_LIGHT_COND_DESCR_FR"),
+                                                                   which( colnames(df_model)=="TX_BUILD_UP_AREA_DESCR_FR"),
+                                                                   which( colnames(df_model)=="CD_AGE_CLS"),
+                                                                   which( colnames(df_model)=="TX_SEX_DESCR_FR"),
+                                                                   which( colnames(df_model)=="TX_ROAD_USR_TYPE_DESCR_FR"),
+                                                                   which( colnames(df_model)=="TX_COLL_TYPE_DESCR_FR")
+                                                                  )
+                                            )
+,type='response')
+
+
+fitted.results <- ifelse(fitted.results > 0.5,1,0)
+col_na = which(is.na(fitted.results))
+
+Dead_Model_count <- nrow(filter(df_model_Test, MS_SERLY_INJ == 1))
+
+
+misClasificError <- mean(fitted.results[-col_na] != df_model_Test$Victims[-col_na])
+print(paste('Accuracy',1-misClasificError))
+
+
+
+attributes(m)
+m$coef
+View(m$coef)
+
+
 # model mpg ~ cyl with cyl being categorical
 
 # plot the predictions
