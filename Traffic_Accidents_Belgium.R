@@ -146,7 +146,7 @@ ggplot(tmp, aes(x = tmp$CD_AGE_CLS, color = tmp$CD_SEX)) +
   geom_density(stat = "count", position="identity", alpha=1, size = 1.1) +
   scale_y_continuous(breaks = seq(0, 230, 10)) +
   scale_x_continuous(limits = c(18,90), breaks = seq(18, 90, 5)) +
-  labs(x = "Victime Age",y = "Number Dead", title = "Age distibution") + 
+  labs(x = "Victime Age",y = "Number of Victims", title = "Age distibution") + 
   scale_colour_manual("Gender",values=c("orange","red"))
 
 ##Latitude longitute per comune PostCode - Comune - Long - Latitude
@@ -225,23 +225,26 @@ library(googleVis)
 
 
 Map_Autoroute <- gvisGeoChart(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="A"), "latlong", 
-                              colorvar='count_dead', hovervar='TX_ADM_DSTR_DESCR_FR',
+                              colorvar='count_dead', 
+                              hovervar='TX_ADM_DSTR_DESCR_FR',
                               options=list(region=      "BE", 
                                            dataMode=    "Marker",
                                            #displayMode= "provinces",
                                            resolution="provinces",
-                                           colorAxis="{values:[0, 120],
+                                           colorAxis="{values:[0, 500],
                                                        colors:[\'White', \'Blue\']}"
                               )
 )
+plot(Map_Autoroute)
 
 Map_Route <- gvisGeoChart(filter(df_reduce_LatLong_,str_sub(TX_ROAD_TYPE_DESCR_FR,1,1)=="R"), "latlong", 
-                          colorvar='count_dead', hovervar='TX_ADM_DSTR_DESCR_FR',
+                          colorvar='count_dead', 
+                          hovervar='TX_ADM_DSTR_DESCR_FR',
                           options=list(region=      "BE", 
                                        dataMode=    "Marker",
                                        #displayMode= "provinces",
                                        resolution="provinces", 
-                                       colorAxis="{values:[50, 500],
+                                       colorAxis="{values:[0, 500],
                                                        colors:[\'green', \'red\']}"
                           )
 )
@@ -257,6 +260,12 @@ AT_T <- gvisMerge(Map_Autoroute,Table_Autoroute, horizontal=TRUE)
 AT_R <- gvisMerge(Map_Route,Table_Route, horizontal=TRUE) 
 AT <- gvisMerge(AT_T,AT_R,horizontal = FALSE)
 
+AT$html$header = paste("Deadly Accidents on Motorways (Top) and Secondary Roads (Bottom) from",
+                              min(year(df_reduce_LatLong$DT_DAY)),
+                              "Untill",
+                              max(year(df_reduce_LatLong$DT_DAY)),  
+                              sep=" ")
+
 plot(AT)
 
 #cat(AT$html$chart, file = "Traffic_accidents_by_district.html")
@@ -270,18 +279,17 @@ library(MASS)
 
 df_model <- df_reduce_LatLong %>% 
   filter(df_reduce_LatLong$TX_VCT_TYPE_DESCR_FR == "Conducteur ou piéton" &
-           (TX_SEX_DESCR_FR           != "Non disponible"   | !is.na(TX_SEX_DESCR_FR)) & 
-           (TX_LIGHT_COND_DESCR_FR    != "Non disponible"   | !is.na(TX_LIGHT_COND_DESCR_FR)) & 
-           (TX_ROAD_TYPE_DESCR_FR     != "Inconnu"          | !is.na(TX_ROAD_TYPE_DESCR_FR)) & 
-           (TX_BUILD_UP_AREA_DESCR_FR != "Non disponible"   | !is.na(TX_BUILD_UP_AREA_DESCR_FR)) & 
-           (TX_ROAD_USR_TYPE_DESCR_FR != "Non disponible"   | !is.na(TX_ROAD_USR_TYPE_DESCR_FR ) | (TX_ROAD_USR_TYPE_DESCR_FR != "Inconnu"))) %>% 
+           (TX_SEX_DESCR_FR           != "Non disponible") & 
+           (TX_LIGHT_COND_DESCR_FR    != "Non disponible") &
+           (TX_ROAD_TYPE_DESCR_FR     != "Inconnu"      )  &
+           (TX_BUILD_UP_AREA_DESCR_FR != "Non disponible") &
+           (TX_ROAD_USR_TYPE_DESCR_FR != "Non disponible") &
+           (TX_ROAD_USR_TYPE_DESCR_FR != "Inconnu" )) %>% 
+  filter(TX_COLL_TYPE_DESCR_FR     != "Non disponible") %>% 
+  filter(!is.na(Victims)) %>% 
   mutate(Victims = MS_DEAD + MS_VCT + MS_SLY_INJ + MS_SERLY_INJ + MS_MORY_INJ + MS_DEAD_30_DAYS) %>% 
-  mutate(Victims = as.factor(ifelse(Victims > 0,1,0))) %>% 
-  filter(!is.na(Victims))
+  mutate(Victims = as.factor(ifelse(Victims > 0,1,0)))
 
-#TX_ROAD_USR_TYPE_DESCR_FR Inconnu
-#library(Amelia)
-# missmap(df_model, main = "Missing values vs observed")
 
 
 n <- nrow(df_model)
@@ -290,26 +298,33 @@ ind <- sample(c(TRUE, FALSE), n, replace=TRUE, prob=c(0.8, 0.2))
 df_model_Train =  df_model[ind, ]
 df_model_Test =  df_model[!ind, ]
   
+#TX_ROAD_USR_TYPE_DESCR_FR Inconnu
+library(Amelia)
+missmap(df_model_Test[1:500,], main = "Missing values vs observed", y.cex = 0, x.cex = 0.5)
+
 
 library(modelr)
 
 m <- glm( Victims ~  
-     DT_HOUR + 
-     TX_DAY_OF_WEEK_DESCR_FR +
-     TX_ROAD_TYPE_DESCR_FR +
-     TX_LIGHT_COND_DESCR_FR +
-     TX_BUILD_UP_AREA_DESCR_FR +
-     CD_AGE_CLS +
-     TX_SEX_DESCR_FR + 
-     TX_ROAD_USR_TYPE_DESCR_FR +
-     TX_COLL_TYPE_DESCR_FR, 
-     family=binomial(link='logit'),
-     data = df_model_Train)
+            DT_HOUR + 
+            TX_DAY_OF_WEEK_DESCR_FR +
+            TX_ROAD_TYPE_DESCR_FR +
+            TX_LIGHT_COND_DESCR_FR +
+            TX_BUILD_UP_AREA_DESCR_FR +
+            CD_AGE_CLS +
+            TX_SEX_DESCR_FR + 
+            TX_ROAD_USR_TYPE_DESCR_FR +
+            TX_COLL_TYPE_DESCR_FR, 
+          family=binomial(link='logit'),
+          data = df_model_Train)
 
 
-summary(m)
+View(summary(m))
+View(coefficients(m))
 
-# anova(m, test="Chisq")
+
+
+anova(m, test="Chisq")
 
 #-------------------------------------------------------------------------------
 # MEASURING THE PREDICTIVE ABILITY OF THE MODEL
@@ -328,13 +343,14 @@ fitted.results <- predict(m,newdata=subset(df_model_Test,select=c( which( colnam
 ,type='response')
 
 
-fitted.results <- ifelse(fitted.results > 0.1,1,0)
-col_na = which(is.na(fitted.results))
+fitted.results_logical <- ifelse(fitted.results > 0.5,1,0)
+
+col_na = which(is.na(fitted.results_logical))
 
 Dead_Model_count <- nrow(filter(df_model_Test, MS_SERLY_INJ == 1))
 
 
-misClasificError <- mean(fitted.results[-col_na] != df_model_Test$Victims[-col_na])
+misClasificError <- mean(fitted.results_logical[-col_na] != df_model_Test$Victims[-col_na])
 print(paste('Accuracy',1-misClasificError))
 
 
@@ -343,394 +359,17 @@ library(ROCR)
 pr <- prediction(fitted.results, df_model_Test$Victims)
 # TPR = sensitivity, FPR=specificity
 
-prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+prf <- performance(pr, measure = "tpr", x.measure = "fpr", xlim = c(0, 1), ylim = c(0, 1), panel.first = grid())
 plot(prf)
 
-
-
-
-
-
-
-
+auc <- performance(pr, measure = "auc")
+perf <- performance(pr, measure = "auc")
+print("AUC: ", perf)
 
 
 attributes(m)
 m$coef
 View(m$coef)
+View(m$coefficients)
+exp(coef(m))
 
-
-# model mpg ~ cyl with cyl being categorical
-
-# plot the predictions
-df_model %>%
-  select(MS_DEAD, 
-#         DT_HOUR, 
-#         TX_DAY_OF_WEEK_DESCR_FR, 
-#         TX_ROAD_TYPE_DESCR_FR,
-#         TX_LIGHT_COND_DESCR_FR,
-#         TX_BUILD_UP_AREA_DESCR_FR,
-#         CD_AGE_CLS,
-         TX_SEX_DESCR_FR) %>%
-  add_predictions(m) %>%
- # add_residuals(m) %>%
-  ggplot(aes(TX_SEX_DESCR_FR, MS_DEAD)) +
-#  geom_point() +
-  geom_line(aes(y = pred), color = "red")
-
-
-ggplot(df_model, aes(x = TX_SEX_DESCR_FR, y = MS_DEAD)) + 
-  geom_point() +
-  stat_smooth(method = "lm", col = "red")
-
-
-
-
-
-# plot the residuals
-mtcars %>%
-  add_residuals(mtcars_mod2) %>%
-  ggplot(aes(as.factor(cyl))) +
-  geom_ref_line(h = 0) +
-  geom_point(aes(y = resid))
-
-
-
-
-
-# http://www.bnosac.be/index.php/blog/55-belgiummaps-statbel-r-package-with-administrative-boundaries-of-belgium
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# and in Brussels which comunes are more affected by car accidents? 
-# use ggmap
-
-library(ggmap)
-# load the data
-tartu_housing <- read.csv("data/tartu_housing_xy_wgs84_a.csv", sep = ";")
-
-# Download the base map
-tartu_map_g_str <- get_map(location = "tartu", zoom = 13)
-# Draw the heat map
-ggmap(tartu_map_g_str, extent = "device") + geom_density2d(data = tartu_housing, aes(x = lon, y = lat), size = 0.3) + 
-  stat_density2d(data = tartu_housing, 
-                 aes(x = lon, y = lat, fill = ..level.., alpha = ..level..), size = 0.01, 
-                 bins = 16, geom = "polygon") + scale_fill_gradient(low = "green", high = "red") + 
-  scale_alpha(range = c(0, 0.3), guide = FALSE)
-
-qmap(location = 'Bruxelles', zoom = 10, maptype = 'hybrid')
-
-
-
-plot(GeoStates)
-
-### Comparison Accidents by Geography
-## plotting Deads by Region
-df_reduce_summary <- df_reduce %>% 
-  group_by(year(DT_DAY),TX_RGN_DESCR_FR ) %>% 
-  summarise(sum(MS_VCT),
-            sum(MS_SLY_INJ),
-            sum(MS_SERLY_INJ),
-            sum(MS_DEAD_30_DAYS),
-            sum(MS_DEAD))
-df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
-
-ggplot(df_reduce_summary, aes(x=TX_RGN_DESCR_FR,y=`sum(MS_DEAD)`,fill=TX_RGN_DESCR_FR)) +
-  facet_grid(~df_reduce_summary$`year(DT_DAY)`, scales = 'free_x') +
-  geom_bar(stat = "identity") + 
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))
-
-## plotting Deads by Province
-df_reduce_summary <- df_reduce %>% 
-  group_by(year(DT_DAY),TX_PROV_DESCR_FR ) %>% 
-  summarise(sum(MS_VCT),
-            sum(MS_SLY_INJ),
-            sum(MS_SERLY_INJ),
-            sum(MS_DEAD_30_DAYS),
-            sum(MS_DEAD))
-df_reduce_summary <- arrange(df_reduce_summary,desc(`sum(MS_DEAD)`))
-
-ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)`,group = df_reduce_summary$TX_PROV_DESCR_FR)) +
-  geom_line(aes(colour = TX_PROV_DESCR_FR, position = "stack")) +
-  geom_point(aes(colour = TX_PROV_DESCR_FR, position = "stack"))  + 
-  theme(axis.text.x = element_text(angle = 60, hjust = 1))
-
-ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_SERLY_INJ)`,group = df_reduce_summary$TX_PROV_DESCR_FR)) +
-  geom_line(aes(colour = TX_PROV_DESCR_FR, position = "stack")) +
-  geom_point(aes(colour = TX_PROV_DESCR_FR, position = "stack"))
-
-
-
-
-
-
-barplot(table(df_reduce$CD_AGE_CLS), horiz = F)
-barplot(table(acc_reduce_summary$TX_LIGHT_COND_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_VCT_TYPE_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_SEX_DESCR_FR), horiz = F,las=2)
-barplot(table(acc_reduce_summary$TX_MUNTY_DESCR_FR), horiz = T,las=2)
-barplot(table(acc_reduce_summary$TX_PROV_DESCR_FR), horiz = T,cex.names = 0.8, las=2)
-
-which(df_reduce_summary$sex=="Femmes")
-
-head(df_reduce)
-
-
-
-
-
-
-
-
-
-
-
-
-
-file_list <- list.files(pattern = "*.txt")
-
-print(file_list)
-
-rm (acc_temp, acc)
-
-for (file_ in file_list) {
-  
-  if (!exists("acc")){
-    acc <- read_delim(file = file_ ,delim = "|",col_names = TRUE) 
-  }
-  
-  if (exists("acc")){
-  
-  acc_temp <- read_delim(file = file_ ,delim = "|",col_names = TRUE)  
-  acc <- rbind(acc, acc_temp)
-  rm (acc_temp)
-  
-  }
-
-}
-
-# acc_2015 <- read_delim("TF_ACCIDENTS_VICTIMS_2015.txt",delim = "|",col_names = TRUE)
-
-acc_reduce <- acc %>% select(-ends_with("NL")) 
-
-# summary of numeber of victims by year and comune
-View(head(acc_reduce))
-
-acc_reduce_summary <- acc_reduce %>% 
-  separate(DT_DAY,into = c("year","month","day")) %>% 
-  mutate(year, class("numeric")) %>% 
-  group_by(year, TX_AGE_CLS_DESCR_FR)  %>%  #, TX_MUNTY_DESCR_FR
-  arrange(desc(TX_AGE_CLS_DESCR_FR)) 
-
-barplot(table(acc_reduce_summary$TX_AGE_CLS_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_LIGHT_COND_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_VCT_TYPE_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_SEX_DESCR_FR), horiz = F,las=2)
-barplot(table(acc_reduce_summary$TX_MUNTY_DESCR_FR), horiz = T,las=2)
-barplot(table(acc_reduce_summary$TX_PROV_DESCR_FR), horiz = T,cex.names = 0.8, las=2)
-
-which(acc_reduce_summary$TX_SEX_DESCR_FR=="Femmes")
-
-
-mydata <- data.frame(Barplot1=rbinom(5,16,0.6), Barplot2=rbinom(5,16,0.25),
-                     Barplot3=rbinom(5,5,0.25), Barplot4=rbinom(5,16,0.7))
-barplot(as.matrix(mydata), main="Interesting", ylab="Total", beside=TRUE, 
-        col=terrain.colors(5))
-
-legend(13, 12, c("Label1","Label2","Label3","Label4","Label5"), cex=0.6, 
-       fill=terrain.colors(5))
-
-
-
-
-
-
-Comune <- "Malines"
-
-acc_reduce_summary <- acc_reduce %>% 
-  filter(TX_MUNTY_DESCR_FR == c(Comune)) %>% 
-  separate(DT_DAY,into = c("year","month","day")) %>% 
-  mutate(year, class("numeric")) %>% 
-  group_by(year, TX_AGE_CLS_DESCR_FR)  %>%  #, TX_MUNTY_DESCR_FR
-  summarize( "count_MS_DEAD" = sum(MS_DEAD), 
-               "count_MS_DEAD_30_DAYS" = sum(MS_DEAD_30_DAYS),
-               "count_MS_MORY_INJ" = sum(MS_MORY_INJ),
-               "count_MS_SERLY_INJ" = sum(MS_SERLY_INJ))  
-
-
-summarise(acc_reduce_summary)
-
-acc_reduce_summary$year <- as.numeric(as.character(acc_reduce_summary$year))
-
-summarise(acc_reduce_summary)
-
-ggplot(data = acc_reduce_summary) + geom_line(aes( acc_reduce_summary$year, acc_reduce_summary$count_MS_DEAD), colour="green")
-
-# we can get frequency tables across two groups
-View(counts) <- table(acc_reduce_summary$`TX_AGE_CLS_DESCR_FR`,acc_reduce_summary$count_MS_SERLY_INJ)
-
-# you can plot these results either stacked or side-by-side with barplot()
-
-
-
-# you can turn these counts into proportions
-proportions <- prop.table(counts)
-
-# now plot these results in a similar manner as above
-barplot()
-
-
-
-
-
-#ggplot(data = acc_reduce_summary, aes(x=TX_AGE_CLS_DESCR_FR)) + geom_histogram()
-
-ggplot(data = mpg, aes(x = hwy)) + geom_histogram()
-
-class(acc_reduce_summary$year)
-
-class(acc_reduce_summary)
-
-plot(Year_,Count_Inj, main = "Dead count in St.Josse",sub = "Road Accidents") 
-par(new=TRUE)
-lines(Year_,Count_dead, col="green")
-
-
-hist(table(filter(acc_reduce_summary, TX_MUNTY_DESCR_FR == "Saint-Josse-ten-Noode")), breaks = 2 )
-
-
-=======
-
-library(googleVis)
-library(dplyr)
-library(readr)
-library(ggplot2)
-library(tidyr)
-
-setwd("C:/Users/gabriele.a/Documents/R/")
-
-file_list <- list.files(pattern = "*.txt")
-
-print(file_list)
-
-rm (acc_temp, acc)
-
-for (file_ in file_list) {
-  
-  if (!exists("acc")){
-    acc <- read_delim(file = file_ ,delim = "|",col_names = TRUE) 
-  }
-  
-  if (exists("acc")){
-  
-  acc_temp <- read_delim(file = file_ ,delim = "|",col_names = TRUE)  
-  acc <- rbind(acc, acc_temp)
-  rm (acc_temp)
-  
-  }
-
-}
-
-# acc_2015 <- read_delim("TF_ACCIDENTS_VICTIMS_2015.txt",delim = "|",col_names = TRUE)
-
-acc_reduce <- acc %>% select(-ends_with("NL")) 
-
-# summary of numeber of victims by year and comune
-View(head(acc_reduce))
-
-acc_reduce_summary <- acc_reduce %>% 
-  separate(DT_DAY,into = c("year","month","day")) %>% 
-  mutate(year, class("numeric")) %>% 
-  group_by(year, TX_AGE_CLS_DESCR_FR)  %>%  #, TX_MUNTY_DESCR_FR
-  arrange(desc(TX_AGE_CLS_DESCR_FR)) 
-
-barplot(table(acc_reduce_summary$TX_AGE_CLS_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_LIGHT_COND_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_VCT_TYPE_DESCR_FR), horiz = F)
-barplot(table(acc_reduce_summary$TX_SEX_DESCR_FR), horiz = F,las=2)
-barplot(table(acc_reduce_summary$TX_MUNTY_DESCR_FR), horiz = T,las=2)
-barplot(table(acc_reduce_summary$TX_PROV_DESCR_FR), horiz = T,cex.names = 0.8, las=2)
-
-which(acc_reduce_summary$TX_SEX_DESCR_FR=="Femmes")
-
-
-mydata <- data.frame(Barplot1=rbinom(5,16,0.6), Barplot2=rbinom(5,16,0.25),
-                     Barplot3=rbinom(5,5,0.25), Barplot4=rbinom(5,16,0.7))
-barplot(as.matrix(mydata), main="Interesting", ylab="Total", beside=TRUE, 
-        col=terrain.colors(5))
-
-legend(13, 12, c("Label1","Label2","Label3","Label4","Label5"), cex=0.6, 
-       fill=terrain.colors(5))
-
-
-
-
-
-
-Comune <- "Malines"
-
-acc_reduce_summary <- acc_reduce %>% 
-  filter(TX_MUNTY_DESCR_FR == c(Comune)) %>% 
-  separate(DT_DAY,into = c("year","month","day")) %>% 
-  mutate(year, class("numeric")) %>% 
-  group_by(year, TX_AGE_CLS_DESCR_FR)  %>%  #, TX_MUNTY_DESCR_FR
-  summarize( "count_MS_DEAD" = sum(MS_DEAD), 
-               "count_MS_DEAD_30_DAYS" = sum(MS_DEAD_30_DAYS),
-               "count_MS_MORY_INJ" = sum(MS_MORY_INJ),
-               "count_MS_SERLY_INJ" = sum(MS_SERLY_INJ))  
-
-
-summarise(acc_reduce_summary)
-
-acc_reduce_summary$year <- as.numeric(as.character(acc_reduce_summary$year))
-
-summarise(acc_reduce_summary)
-
-ggplot(data = acc_reduce_summary) + geom_line(aes( acc_reduce_summary$year, acc_reduce_summary$count_MS_DEAD), colour="green")
-
-# we can get frequency tables across two groups
-View(counts) <- table(acc_reduce_summary$`TX_AGE_CLS_DESCR_FR`,acc_reduce_summary$count_MS_SERLY_INJ)
-
-# you can plot these results either stacked or side-by-side with barplot()
-
-
-
-# you can turn these counts into proportions
-proportions <- prop.table(counts)
-
-# now plot these results in a similar manner as above
-barplot()
-
-
-
-
-
-#ggplot(data = acc_reduce_summary, aes(x=TX_AGE_CLS_DESCR_FR)) + geom_histogram()
-
-ggplot(data = mpg, aes(x = hwy)) + geom_histogram()
-
-class(acc_reduce_summary$year)
-
-class(acc_reduce_summary)
-
-plot(Year_,Count_Inj, main = "Dead count in St.Josse",sub = "Road Accidents") 
-par(new=TRUE)
-lines(Year_,Count_dead, col="green")
-
-
-hist(table(filter(acc_reduce_summary, TX_MUNTY_DESCR_FR == "Saint-Josse-ten-Noode")), breaks = 2 )
-
-
->>>>>>> fc94cc93a90ebc7f3203980f2c3759931c1e07b4
-View(head(acc_reduce))
