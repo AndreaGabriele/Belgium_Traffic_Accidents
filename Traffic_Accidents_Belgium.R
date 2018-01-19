@@ -94,7 +94,7 @@ ggplot(df_reduce_summary, aes(x=df_reduce_summary$`year(DT_DAY)`,y=`sum(MS_DEAD)
   theme(axis.text.x=element_text(size = 9, colour = "black", angle = 90, hjust = 0, vjust = 0.5),
         axis.text.y=element_text(size = 9, colour = "black", angle = 0, hjust = 0, vjust = 0.5)) +
 scale_fill_manual("Gender",values=c("orange","red","grey"))
-
+  
     
 ### Difference between Male / Female Victimes
 df_reduce_summary <- df_reduce %>% 
