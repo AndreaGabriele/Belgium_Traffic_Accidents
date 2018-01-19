@@ -64,7 +64,7 @@ file.remove(tf)
 
 # Remove the Dutch Colums
 df_reduce <- df %>% select(-ends_with("NL")) 
-df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME)) 
+#df_headers_reduce <- df_headers %>% filter(!grepl("_NL",NAME)) 
 #View(df_headers_reduce)
 #Rename the Colums using metadata
 #names(df_reduce) <- df_headers_reduce$LABEL
